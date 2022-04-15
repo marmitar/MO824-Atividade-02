@@ -148,7 +148,6 @@ class SubTours(Iterable[Tour]):
     def __init__(self, vertices: Tour, solution: LinkDict[float]) -> None:
         self.vertices = vertices
         self.seen: set[Vertex] = set()
-        self.iter = iter(range(len(vertices)))
         self.solution = solution
 
     def new_node(self) -> Vertex | None:

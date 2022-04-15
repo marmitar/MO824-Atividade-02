@@ -1,1 +1,33 @@
 \section{Modelo}
+
+    \[
+        \min \sum_{e \in E} c_e x_e
+    \]
+
+    Constraints:
+
+    \begin{align*}
+        \sum_{e \in \delta(v)} x_e = 2
+            && \forall v \in V \\
+        \sum_{e \in E(S)} x_e \leq |S| - 1
+            && \forall S \subset V \\
+        x_e \in \{0, 1\}
+            && \forall e \in E
+    \end{align*}
+
+    \subsection{kS}
+
+        \[
+            \min \sum_{e \in E} \left(c_e^1 x_e^1 + c_e^2 x_e^2\right)
+        \]
+
+        Constraints:
+
+        \begin{align*}
+            \sum_{e \in \delta(v)} x_e = 2
+                && \forall v \in V \\
+            \sum_{e \in E(S)} x_e \leq |S| - 1
+                && \forall S \subset V \\
+            x_e \in \{0, 1\}
+                && \forall e \in E
+        \end{align*}
