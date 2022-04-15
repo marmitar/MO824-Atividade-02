@@ -13,6 +13,7 @@ from gurobipy import GRB, Model, Var, tupledict
 rng = Random(0x0123456789ABCDEF)
 vertex_id = count()
 
+
 @dataclass(frozen=True)
 class Vertex:
     x1: float
@@ -54,6 +55,7 @@ LinkDict = tupledict[Vertex, tupledict[Vertex, T]]
 Tour = tuple[Vertex, ...]
 
 COORDS_FILE = os.path.join(os.path.dirname(__file__), 'coordenadas.txt')
+
 
 class Graph:
     def __init__(self, vertices: Iterable[Vertex]):
@@ -173,6 +175,7 @@ class SubTours(Iterable[Tour]):
 
     def __iter__(self) -> Iterator[Tour]:
         return self.tours()
+
 
 if __name__ == '__main__':
     g = Graph.read(sample_size=100)

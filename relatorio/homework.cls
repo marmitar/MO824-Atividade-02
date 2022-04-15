@@ -78,21 +78,30 @@
     \thispagestyle{footnotes}
 }
 
+\newcommand{\homework@student}[4][0.3\textwidth]{%
+    \begin{minipage}{#1}
+        \normalsize\centering
+        % #2 ~(#3) \\
+        #2 \\
+        {\small RA~ #3} \\
+        \href{mailto:#4}{\texttt{#4}}
+    \end{minipage}%
+}
+
 % ensure that the title is inserted in the document
 \title{\vspace{-2\baselineskip}Atividade \homework@assignment}
 % \author{\aga@authorsProcessed}
 \author{
     \hfill%
-    \begin{minipage}{0.4\textwidth}
-        \centering
-        Tiago de Paula Alves ~(187679) \\
-        \href{mailto:tiagodepalves@gmail.com}{\texttt{tiagodepalves@gmail.com}}
-    \end{minipage}%
-    \begin{minipage}{0.4\textwidth}
-        \centering
-        Vinicius da Silva ~(206734) \\
-        \href{mailto:v206734@dac.unicamp.br}{\texttt{v206734@dac.unicamp.br}}
-    \end{minipage}%
+    \homework@student
+        {Lucas Pedroso Cantanhede}{202058}
+        {lpedrosoc@gmail.com}%
+    \homework@student
+        {Tiago de Paula Alves}{187679}
+        {tiagodepalves@gmail.com}%
+    \homework@student
+        {Rafael Marques Miorim}{157065}
+        {rmmiorim@hotmail.com}%
     \hfill
 }
 \AtBeginDocument{\maketitle\thispagestyle{fancy}}
