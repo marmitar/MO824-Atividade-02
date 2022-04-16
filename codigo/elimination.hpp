@@ -4,6 +4,7 @@
 #include <chrono>
 #include <optional>
 #include <cstdlib>
+#include <span>
 #include <stdexcept>
 #include <vector>
 
@@ -12,35 +13,59 @@
 
 
 namespace utils {
-    template<size_t count, typename T>
-    using matrix = std::array<std::array<T, count>, count>;
+    template<typename T>
+    class matrix final {
+    private:
+        size_t len;
+        T *buf;
+    public:
+        inline matrix(size_t n): len(n) {
+            this->buf = new T[n * n];
+        }
+
+        inline ~matrix() noexcept {
+            delete[] this->buf;
+            this->len = 0;
+        }
+
+        constexpr size_t size(void) const noexcept {
+            return this->len;
+        }
+
+        constexpr size_t total(void) const noexcept {
+            return this->len * this->len;
+        }
+
+        constexpr std::span<T> operator[](std::size_t idx) noexcept {
+            return std::span<T>(this->buf + idx * this->len, this->len);
+        }
+
+        constexpr std::span<const T> operator[](std::size_t idx) const noexcept {
+            return std::span<T>(this->buf + idx * this->len, this->len);
+        }
+    };
 }
 
 
-template<size_t count>
 class subtour_elim final: public GRBCallback {
 private:
     class sub_tours final {
     private:
-        static auto empty_array(void) noexcept {
-            std::array<bool, count> arr;
-            for (size_t i = 0; i < count; i++) {
-                arr[i] = false;
-            }
-            return arr;
-        }
-
-        std::array<bool, count> seen = sub_tours::empty_array();
+        std::vector<bool> seen;
     public:
-        const std::array<vertex, count>& vertices;
-        const utils::matrix<count, double>& solution;
+        const std::vector<vertex>& vertices;
+        const  utils::matrix<double>& solution;
 
-        sub_tours(const std::array<vertex, count>& vertices, const utils::matrix<count, double>& solution) noexcept:
-            vertices(vertices), solution(solution)
+        sub_tours(const std::vector<vertex>& vertices, const  utils::matrix<double>& solution) noexcept:
+            seen(vertices.size(), false), vertices(vertices), solution(solution)
         { }
 
+        inline size_t count(void) const noexcept {
+            return this->vertices.size();
+        }
+
         inline std::optional<size_t> new_node(void) const noexcept {
-            for (size_t node = 0; node < count; node++) {
+            for (size_t node = 0; node < this->count(); node++) {
                 if (!this->seen[node]) {
                     return node;
                 }
@@ -50,7 +75,7 @@ private:
 
         inline std::optional<size_t> best_next(size_t u) const noexcept {
             auto solution = this->solution[u];
-            for (size_t v = 0; v < count; v++) {
+            for (size_t v = 0; v < this->count(); v++) {
                 if (solution[v] > 0.5 && !this->seen[v]) {
                     return v;
                 }
@@ -60,9 +85,9 @@ private:
 
         inline std::vector<size_t> next_tour(size_t node) noexcept {
             auto vertices = std::vector<size_t>();
-            vertices.reserve(count);
+            vertices.reserve(this->count());
 
-            for (size_t len = count; len > 0; len--) {
+            for (size_t len = this->count(); len > 0; len--) {
                 this->seen[node] = true;
                 vertices.push_back(node);
 
@@ -83,28 +108,31 @@ private:
         }
     };
 
-    const std::array<vertex, count>& vertices;
-    const utils::matrix<count, GRBVar>& vars;
+    const std::vector<vertex>& vertices;
+    const  utils::matrix<GRBVar>& vars;
 
-    static auto all_vertices(void) noexcept {
-        auto vec = std::vector<size_t>();
-        vec.reserve(count);
+    inline auto all_vertices(void) const noexcept {
+        auto vec = std::vector<size_t>(this->count(), 0);
 
-        for (size_t i = 0; i < count; i++) {
+        for (size_t i = 0; i < vec.size(); i++) {
             vec[i] = i;
         }
         return vec;
     }
 
 public:
-    inline subtour_elim(const std::array<vertex, count>& vertices, const utils::matrix<count, GRBVar>& vars) noexcept:
+    inline subtour_elim(const std::vector<vertex>& vertices, const  utils::matrix<GRBVar>& vars) noexcept:
         vertices(vertices), vars(vars)
     { }
 
-    auto find_sub_tour(const utils::matrix<count, double>& solution) const noexcept {
+    inline size_t count(void) const noexcept {
+        return this->vertices.size();
+    }
+
+    auto find_sub_tour(const  utils::matrix<double>& solution) const noexcept {
         sub_tours tours(this->vertices, solution);
 
-        auto min_tour = subtour_elim<count>::all_vertices();
+        auto min_tour = this->all_vertices();
         while (auto tour = tours.next_tour()) {
             if (tour->size() <= min_tour.size()) {
                 min_tour = *tour;
@@ -113,11 +141,11 @@ public:
         return min_tour;
     }
 
-    utils::matrix<count, double> get_solutions(void) {
-        utils::matrix<count, double> sols;
-        for (size_t u = 0; u < count; u++) {
+    utils::matrix<double> get_solutions(void) {
+         utils::matrix<double> sols(this->count());
+        for (size_t u = 0; u < this->count(); u++) {
             sols[u][u] = 0.0;
-            for (size_t v = u + 1; v < count; v++) {
+            for (size_t v = u + 1; v < this->count(); v++) {
                 auto val = this->getSolution(this->vars[u][v]);
                 sols[u][v] = val;
                 sols[v][u] = val;
@@ -130,7 +158,7 @@ public:
         auto tour = this->find_sub_tour(this->get_solutions());
         auto len = tour.size();
 
-        if (len >= count) {
+        if (len >= this->count()) {
             return;
         }
 
@@ -140,7 +168,7 @@ public:
                 expr += this->vars[tour[u]][tour[v]];
             }
         }
-        this->addLazy(expr, GRB_EQUAL, count-1);
+        this->addLazy(expr, GRB_EQUAL, this->count()-1);
     }
 
 protected:

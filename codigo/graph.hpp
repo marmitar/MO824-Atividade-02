@@ -23,7 +23,6 @@ namespace utils {
 }
 
 
-template<size_t count>
 struct graph final {
 private:
     inline GRBVar add_edge(const vertex& u, const vertex& v) {
@@ -35,10 +34,10 @@ private:
     }
 
     inline auto add_vars(void) {
-        utils::matrix<count, GRBVar> vars;
+         utils::matrix<GRBVar> vars(this->order());
 
-        for (size_t u = 0; u < count; u++) {
-            for (size_t v = u + 1; v < count; v++) {
+        for (size_t u = 0; u < this->order(); u++) {
+            for (size_t v = u + 1; v < this->order(); v++) {
                 auto x_uv = this->add_edge(this->vertices[u], this->vertices[v]);
                 vars[u][v] = x_uv;
                 vars[v][u] = x_uv;
@@ -48,9 +47,9 @@ private:
     }
 
     inline void add_constraint_deg_2(void) {
-        for (size_t u = 0; u < count; u++) {
+        for (size_t u = 0; u < this->order(); u++) {
             auto expr = GRBLinExpr();
-            for (size_t v = 0; v < count; v++) {
+            for (size_t v = 0; v < this->order(); v++) {
                 if (u != v) {
                     expr += this->vars[u][v];
                 }
@@ -61,27 +60,26 @@ private:
 
     GRBModel model;
 public:
-    const std::array<vertex, count> vertices;
-    const utils::matrix<count, GRBVar> vars;
+    const std::vector<vertex> vertices;
+    const  utils::matrix<GRBVar> vars;
 
     using clock = std::chrono::high_resolution_clock;
     const clock::time_point start = clock::now();
 
-    graph(std::array<vertex, count> vertices, const GRBEnv& env):
+    graph(std::vector<vertex> vertices, const GRBEnv& env):
         model(env), vertices(vertices), vars(this->add_vars())
     {
         this->add_constraint_deg_2();
     }
 
     /** Number of vertices. */
-    constexpr inline size_t order(void) const noexcept {
-        constexpr size_t size = this->vertices.size();
-        return size;
+    inline size_t order(void) const noexcept {
+        return this->vertices.size();
     }
 
     /** Number of edges. */
-    constexpr inline size_t size(void) const noexcept {
-        constexpr size_t order = this->order();
+    inline size_t size(void) const noexcept {
+        const size_t order = this->order();
         return (order * (order + 1)) / 2;
     }
 

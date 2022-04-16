@@ -56,16 +56,17 @@ namespace utils {
 
     using seed_type = std::ranlux48::result_type;
 
-    template<size_t count, std::ranges::input_range Range>
-    static inline auto sample(Range&& input, seed_type seed) {
+    template<std::ranges::input_range Range>
+    static inline auto sample(Range&& input, size_t count, seed_type seed) {
         using item = std::ranges::range_value_t<Range>;
         if (count > input.size()) {
             throw not_enough_items::of<item>(input.size(), count);
         }
-        std::array<item, count> output;
+        std::vector<item> output;
+        output.reserve(count);
 
         auto rng = std::ranlux48(seed);
-        std::ranges::sample(input, output.begin(), count, rng);
+        std::ranges::sample(input, std::back_inserter(output), count, rng);
         return output;
     }
 }
@@ -81,6 +82,7 @@ private:
     constexpr vertex(size_t id, double x1, double y1, double x2, double y2) noexcept:
         id(id), x1(x1), y1(y1), x2(x2), y2(y2)
     { }
+
 public:
     size_t id;
     double x1, y1;

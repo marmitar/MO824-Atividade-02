@@ -1,18 +1,16 @@
 #include <array>
 #include <chrono>
-#include <optional>
 #include <cstdlib>
+#include <optional>
+#include <span>
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include "graph.hpp"
 #include "coordinates.hpp"
 #include "argparse.hpp"
 
-
-#ifndef GRAPH_SIZE
-#define GRAPH_SIZE 100
-#endif
 
 class program final {
 private:
@@ -29,6 +27,11 @@ public:
             .help("seed for the sampling method (if empty, a random seed is generated)")
             .default_value<utils::seed_type>(std::random_device {}())
             .scan<'x', utils::seed_type>();
+
+        this->args.add_argument("-n", "--nodes")
+            .help("sample size for the subgraph")
+            .default_value<size_t>(100)
+            .scan<'u', size_t>();
     }
 
     explicit program(std::vector<std::string> arguments): program(arguments[0]) {
@@ -55,22 +58,31 @@ public:
         return this->args.get<utils::seed_type>("seed");
     }
 
-    template<size_t count>
-    inline std::array<vertex, count> vertices(void) const {
+    inline utils::seed_type nodes(void) const {
+        return this->args.get<size_t>("nodes");
+    }
+
+    inline std::variant<std::vector<vertex>, decltype(DEFAULT_VERTICES)> vertices(void) const {
         if (auto filename = this->filename()) {
-            return utils::sample<count>(vertex::read(*filename), this->seed());
+            return vertex::read(*filename);
         } else {
-            return utils::sample<count>(DEFAULT_VERTICES, this->seed());
+            return DEFAULT_VERTICES;
         }
     }
 
-    template<size_t count>
-    inline graph<count> map(void) const {
-        return graph<count>(this->vertices<count>(), this->env);
+    std::vector<vertex> sample(void) const {
+        auto sampler = [this](auto&& vertices) {
+            return utils::sample(vertices, this->nodes(), this->seed());
+        };
+        return std::visit(sampler, this->vertices());
     }
 
-    void run(void) {
-        auto g = this->map<GRAPH_SIZE>();
+    inline graph map(void) const {
+        return graph(this->sample(), this->env);
+    }
+
+    void run(void) const {
+        auto g = this->map();
 
         auto elapsed = g.solve();
         std::cout << elapsed << '\n';
@@ -79,28 +91,27 @@ public:
 
 
 int main(int argc, const char * const argv[]) {
-    program program(std::vector<std::string>(argv, argv + argc));
+    const program program(std::vector<std::string>(argv, argv + argc));
 
 #ifdef NDEBUG
     program.run();
-    return EXIT_SUCCESS;
 #else
     try {
         program.run();
-        return EXIT_SUCCESS;
 
     } catch (const std::exception& err) {
-        std::cerr << "std::exception: " << err.what() << '\n';
+        std::cerr << "std::exception: " << err.what() << std::endl;
         return EXIT_FAILURE;
 
     } catch (const GRBException& err) {
-        std::cerr << "GRBException: " << err.getMessage() << '\n';
-        std::cerr << "GRBEnv::getErrorMsg: " << program.env.getErrorMsg() << '\n';
+        std::cerr << "GRBException: " << err.getMessage() << std::endl;
+        std::cerr << "GRBEnv::getErrorMsg: " << program.env.getErrorMsg() << std::endl;
         return EXIT_FAILURE;
 
     } catch (...) {
-        std::cerr << "unknown exception!" << '\n';
+        std::cerr << "unknown exception!" << std::endl;
         return EXIT_FAILURE;
     }
 #endif
+    return EXIT_SUCCESS;
 }
