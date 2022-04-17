@@ -2,12 +2,13 @@ CC := g++
 LDFLAGS := -lgurobi_c++ -lgurobi -lgurobi95
 
 ifneq ($(strip $(DEBUG)),)
-CXXFLAGS := -std=gnu++2b -Wall -Werror -Wpedantic -Wunused-result -O0 -ggdb3
+CXXFLAGS := -std=gnu++2b -Wall -Werror -Wpedantic -Wunused-result -O0 -ggdb3 -DDEBUG
 else
-CXXFLAGS := -std=gnu++2b -Wall -Werror -Wpedantic -Wunused-result -march=native -mtune=native -pipe -fivopts -Ofast -fmodulo-sched -fwhole-program -fno-plt -fno-PIC -fPIE -ffast-math -flto -fuse-linker-plugin -DNDEBUG -D_FORTIFY_SOURCE=1
+CXXFLAGS := -std=gnu++2b -Wall -Werror -Wpedantic -Wunused-result -Ofast -DNDEBUG -D_FORTIFY_SOURCE=1 \
+	-march=native -mtune=native -pipe -fivopts  -fmodulo-sched -fwhole-program -fno-plt -fno-PIC -fPIE -ffast-math -flto -fuse-linker-plugin
 endif
 
-modelo: modelo.cpp argparse.hpp elimination.hpp graph.hpp vertex.hpp coordinates.hpp
+modelo: main.cpp argparse.hpp elimination.hpp graph.hpp vertex.hpp coordinates.hpp
 	$(CC) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
 
 
