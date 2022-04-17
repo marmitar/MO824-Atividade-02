@@ -1,10 +1,7 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
 #include <fstream>
-#include <iostream>
-#include <optional>
 #include <random>
 #include <ranges>
 #include <sstream>
@@ -55,7 +52,7 @@ namespace utils {
         { }
 
     public:
-        template<typename Item> [[gnu::cold]]
+        template <typename Item> [[gnu::cold]]
         static not_enough_items of(size_t current, size_t expected) {
             return not_enough_items(typeid(Item).name(), current, expected);
         }
@@ -63,9 +60,10 @@ namespace utils {
 
     using seed_type = std::ranlux48::result_type;
 
-    template<std::ranges::input_range Range> [[gnu::cold]]
-    static inline auto sample(Range&& input, size_t count, seed_type seed) {
-        using item = std::ranges::range_value_t<Range>;
+    [[gnu::cold]]
+    static inline auto sample(std::ranges::forward_range auto&& input, size_t count, seed_type seed) {
+        using item = std::ranges::range_value_t<decltype(input)>;
+
         if (count > input.size()) [[unlikely]] {
             throw not_enough_items::of<item>(input.size(), count);
         }
@@ -82,29 +80,34 @@ namespace utils {
 struct vertex final {
 private:
     [[gnu::cold]]
-    static inline size_t next_id(void) noexcept {
-        static size_t count = 1;
+    static inline unsigned next_id(void) noexcept {
+        static unsigned count = 1;
         return count++;
     }
 
     [[gnu::cold]]
-    inline constexpr vertex(size_t id, double x1, double y1, double x2, double y2) noexcept:
-        id(id), x1(x1), y1(y1), x2(x2), y2(y2)
+    inline constexpr vertex(unsigned id, double x1, double y1, double x2, double y2) noexcept:
+        ident(id), x1(x1), y1(y1), x2(x2), y2(y2)
     { }
 
-public:
-    size_t id;
+    unsigned ident;
     double x1, y1;
     double x2, y2;
+
+public:
+    constexpr vertex() noexcept: vertex(0U, 0, 0, 0, 0) {}
 
     [[gnu::cold]]
     vertex(double x1, double y1, double x2, double y2) noexcept:
         vertex(vertex::next_id(), x1, y1, x2, y2)
     { }
 
-    constexpr vertex() noexcept: vertex(SIZE_MAX, 0, 0, 0, 0) {}
+    vertex(const vertex& v) noexcept: vertex(v.ident, v.x1, v.y1, v.x2, v.y2) { }
 
-    vertex(const vertex& v) noexcept: vertex(v.id, v.x1, v.y1, v.x2, v.y2) { }
+    [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
+    constexpr inline unsigned id(void) const noexcept {
+        return this->ident;
+    }
 
     [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
     constexpr inline double cost1(const vertex& other) const noexcept {
@@ -118,12 +121,12 @@ public:
 
     [[gnu::pure]] [[gnu::nothrow]]
     constexpr inline bool operator==(const vertex& other) const noexcept {
-        return this->id == other.id;
+        return this->id() == other.id();
     }
 
     [[gnu::nothrow]]
     constexpr inline vertex& operator=(const vertex& other) noexcept {
-        this->id = other.id;
+        this->ident = other.id();
         this->x1 = other.x1;
         this->y1 = other.y1;
         this->x2 = other.x2;
@@ -131,8 +134,9 @@ public:
         return *this;
     }
 
-    [[gnu::cold]]
-    constexpr static vertex with_id(size_t id, double x1, double y1, double x2, double y2) noexcept {
+    template <unsigned id> [[gnu::cold]]
+    constexpr static vertex with_id(double x1, double y1, double x2, double y2) noexcept {
+        static_assert(id > 0, "'id' must be positive.");
         return vertex(id, x1, y1, x2, y2);
     }
 
@@ -160,7 +164,7 @@ public:
 
     [[gnu::cold]]
     friend inline std::ostream& operator<<(std::ostream& os, const vertex& vertex) {
-        return os << "v:" << vertex.id;
+        return os << "v:" << vertex.id();
     }
 
     [[gnu::cold]]

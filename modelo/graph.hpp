@@ -1,10 +1,6 @@
 #pragma once
 
-#include <array>
 #include <chrono>
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
 #include <vector>
 
 #include <gurobi_c++.h>
@@ -31,7 +27,7 @@ private:
     [[gnu::cold]]
     inline GRBVar add_edge(const vertex& u, const vertex& v) {
         std::ostringstream name;
-        name << "x_" << u.id << '_' << v.id;
+        name << "x_" << u.id() << '_' << v.id();
 
         double objective = u.cost1(v);
         return this->model.addVar(0., 1., objective, GRB_BINARY, name.str());
@@ -39,10 +35,10 @@ private:
 
     [[gnu::cold]]
     inline auto add_vars(void) {
-         utils::matrix<GRBVar> vars(this->order());
+        utils::matrix<GRBVar> vars(this->order());
 
-        for (size_t u = 0; u < this->order(); u++) {
-            for (size_t v = u + 1; v < this->order(); v++) {
+        for (unsigned u = 0; u < this->order(); u++) {
+            for (unsigned v = u + 1; v < this->order(); v++) {
                 auto x_uv = this->add_edge(this->vertices[u], this->vertices[v]);
                 vars[u][v] = x_uv;
                 vars[v][u] = x_uv;
@@ -53,9 +49,9 @@ private:
 
     [[gnu::cold]]
     inline void add_constraint_deg_2(void) {
-        for (size_t u = 0; u < this->order(); u++) {
+        for (unsigned u = 0; u < this->order(); u++) {
             auto expr = GRBLinExpr();
-            for (size_t v = 0; v < this->order(); v++) {
+            for (unsigned v = 0; v < this->order(); v++) {
                 if (u != v) [[likely]] {
                     expr += this->vars[u][v];
                 }
@@ -113,8 +109,9 @@ public:
         auto callback = subtour_elim(this->vertices, this->vars);
 
         this->model.setCallback(&callback);
-        this->model.optimize();
+        this->model.update();
 
+        this->model.optimize();
         return this->elapsed();
     }
 };
