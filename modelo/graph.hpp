@@ -14,30 +14,6 @@
 
 
 namespace utils {
-    [[gnu::cold]]
-    static GRBEnv quiet_env(void) {
-        auto env = GRBEnv(true);
-        env.set(GRB_IntParam_OutputFlag, 0);
-        env.set(GRB_IntParam_LazyConstraints, 1);
-        env.start();
-        return env;
-    }
-
-    [[gnu::cold]]
-    static std::string join(std::ranges::forward_range auto range, const std::string_view& sep) {
-        std::ostringstream buf;
-        bool first = true;
-
-        for (const auto& item : range) {
-            if (!first) {
-                buf << sep;
-            }
-            buf << item;
-            first = false;
-        }
-        return buf.str();
-    }
-
     class invalid_solution final : public std::domain_error {
     public:
         const std::vector<vertex> vertices;
@@ -60,6 +36,21 @@ namespace utils {
             return invalid_solution(vertices, subtour, "Solution found, but leads to incomplete tour.");
         }
     };
+
+    [[gnu::cold]]
+    static std::string join(std::ranges::forward_range auto range, const std::string_view& sep) {
+        std::ostringstream buf;
+        bool first = true;
+
+        for (const auto& item : range) {
+            if (!first) {
+                buf << sep;
+            }
+            buf << item;
+            first = false;
+        }
+        return buf.str();
+    }
 }
 
 
@@ -139,7 +130,7 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline int64_t solution_count(void) const {
+    int64_t solution_count(void) const {
         return (int64_t) this->model.get(GRB_IntAttr_SolCount);
     }
 
@@ -158,29 +149,34 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline int64_t iterations(void) const {
-        return (int64_t) this->model.get(GRB_DoubleAttr_IterCount);
+    int64_t iterations(void) const {
+        return this->model.get(GRB_DoubleAttr_IterCount);
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline int64_t var_count(void) const {
-        return (int64_t) this->model.get(GRB_IntAttr_NumVars);
+    int64_t var_count(void) const {
+        return this->model.get(GRB_IntAttr_NumVars);
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline int64_t constr_count(void) const {
-        return (int64_t) this->model.get(GRB_IntAttr_NumConstrs);
+    int64_t constr_count(void) const {
+        return this->model.get(GRB_IntAttr_NumConstrs);
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline auto edges(void) const {
+    double solution_cost(void) const {
+        return this->model.get(GRB_DoubleAttr_ObjVal);
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    auto edges(void) const {
         return utils::get_solutions(this->order(), [this](unsigned i, unsigned j) {
             return this->vars[i][j].get(GRB_DoubleAttr_X) > 0.5;
         });
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline auto tour(void) const {
+    auto tour(void) const {
         auto min = utils::min_sub_tour(this->vertices, [this](unsigned i, unsigned j) {
             return this->vars[i][j].get(GRB_DoubleAttr_X) > 0.5;
         });
@@ -192,7 +188,7 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline auto solution(void) const {
+    auto solution(void) const {
         const auto tour = this->tour();
 
         auto vertices = std::vector<vertex>();
@@ -203,6 +199,4 @@ public:
         }
         return vertices;
     }
-
-    // inline
 };

@@ -28,13 +28,28 @@ private:
 
         this->args.add_argument("-n", "--nodes")
             .help("sample size for the subgraph")
-            .default_value<size_t>(100)
-            .scan<'u', size_t>();
+            .default_value<unsigned>(100)
+            .scan<'u', unsigned>();
 
-        this->args.add_argument("-t", "--timeout")
+        this->args.add_argument("--timeout")
             .help("execution timeout (in minutes), disabled if zero or negative")
             .default_value<double>(30.0)
             .scan<'g', double>();
+
+        this->args.add_argument("-t", "--tour")
+            .help("execution timeout (in minutes), disabled if zero or negative")
+            .default_value(false)
+            .implicit_value(true);
+    }
+
+    [[gnu::cold]]
+    void setup_env(void) {
+        env.set(GRB_IntParam_OutputFlag, 0);
+        env.set(GRB_IntParam_LazyConstraints, 1);
+
+        unsigned seed = this->seed() & 0x0FFFFFFFU;
+        env.set(GRB_IntParam_Seed, (int) seed);
+        env.start();
     }
 
 public:
@@ -42,6 +57,7 @@ public:
     explicit program(const std::vector<std::string>& arguments): program(arguments[0]) {
         try {
             this->args.parse_args(arguments);
+            this->setup_env();
 
         } catch (const std::runtime_error& err) {
             std::cerr << err.what() << std::endl;
@@ -50,7 +66,7 @@ public:
         }
     }
 
-    const GRBEnv env = utils::quiet_env();
+    GRBEnv env = GRBEnv(true);
 
     [[gnu::cold]]
     inline std::optional<std::string> filename(void) const {
@@ -63,18 +79,28 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline auto seed(void) const {
+    inline utils::seed_type seed(void) const {
         return this->args.get<utils::seed_type>("seed");
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline auto nodes(void) const {
-        return this->args.get<size_t>("nodes");
+    inline size_t nodes(void) const {
+        return this->args.get<unsigned>("nodes");
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline auto timeout(void) const {
-        return this->args.get<double>("timeout");
+    inline std::optional<double> timeout(void) const {
+        auto value = this->args.get<double>("timeout");
+        if (std::isfinite(value) && value > 0) [[likely]] {
+            return value;
+        } else {
+            return std::nullopt;
+        }
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline bool tour(void) const {
+        return this->args.get<bool>("tour");
     }
 
 private:
@@ -88,7 +114,7 @@ private:
     }
 
     [[gnu::cold]]
-    std::vector<vertex> sample(void) const {
+    inline std::vector<vertex> sample(void) const {
         auto sampler = [this](auto&& vertices) {
             return utils::sample(vertices, this->nodes(), this->seed());
         };
@@ -96,7 +122,7 @@ private:
     }
 
     [[gnu::cold]]
-    inline graph map(void) const {
+    graph map(void) const {
         return graph(this->sample(), this->env);
     }
 
@@ -107,18 +133,19 @@ public:
         std::cout << "Graph(n=" << g.order() << ",m=" << g.size() << "),"
             << " chosen with seed 0x" << std::hex << this->seed() << std::dec << std::endl;
 
-        std::cout << "Model set up, with " << g.var_count() << " variables" <<
-            " and " << g.constr_count() << " constraints." << std::endl;
-
         auto elapsed = g.solve();
         std::cout << "Found " << g.solution_count() << " solution(s)."  << std::endl;
         std::cout << "Iterations: " << g.iterations() << std::endl;
         std::cout << "Execution time: " << elapsed << " secs" << std::endl;
         std::cout << "Variables: " << g.var_count() << std::endl;
         std::cout << "Constraints: " << g.constr_count() << std::endl;
+        std::cout << "Objective cost: " << g.solution_cost() << std::endl;
 
-        std::cout << "Tour:" << std::endl;
-        std::cout << utils::join(g.solution(), "\n") << std::endl;
+        auto solution = g.solution();
+        std::cout << "Tour: total cost " << tour::cost1(solution) << std::endl;
+        if (this->tour()) [[unlikely]] {
+            std::cout << utils::join(solution, "\n") << std::endl;
+        }
     }
 };
 
@@ -153,8 +180,8 @@ namespace timeout {
 int main(int argc, const char * const argv[]) {
     const program program(std::vector<std::string>(argv, argv + argc));
 
-    if (std::isfinite(program.timeout()) && program.timeout() > 0) [[likely]] {
-        timeout::setup(program.timeout());
+    if (auto minutes = program.timeout()) [[likely]] {
+        timeout::setup(*minutes);
     }
 
     try {

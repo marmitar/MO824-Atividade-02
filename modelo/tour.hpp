@@ -22,8 +22,6 @@ namespace utils {
 
         inline ~matrix() {
             delete[] this->buffer;
-            this->buffer = nullptr;
-            this->len = 0;
         }
 
         [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
@@ -141,5 +139,25 @@ public:
             }
         }
         return min_tour;
+    }
+
+    [[gnu::pure]] [[gnu::nothrow]]
+    static double cost1(const std::vector<vertex>& tour) noexcept {
+        double total_cost = 0.0;
+        for (unsigned i = 0; i < tour.size(); i++) {
+            const unsigned next = (i + 1) % tour.size();
+            total_cost += tour[i].cost1(tour[next]);
+        }
+        return total_cost;
+    }
+
+    [[gnu::pure]] [[gnu::nothrow]]
+    static double cost2(const std::vector<vertex>& tour) noexcept {
+        double total_cost = 0.0;
+        for (unsigned i = 0; i < tour.size(); i++) {
+            const unsigned next = (i + 1) % tour.size();
+            total_cost += tour[i].cost2(tour[next]);
+        }
+        return total_cost;
     }
 };

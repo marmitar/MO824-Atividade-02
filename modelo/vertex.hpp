@@ -61,7 +61,7 @@ namespace utils {
     using seed_type = std::ranlux48::result_type;
 
     [[gnu::cold]]
-    static inline auto sample(std::ranges::forward_range auto input, size_t count, seed_type seed) {
+    static auto sample(std::ranges::forward_range auto input, size_t count, seed_type seed) {
         using item = std::ranges::range_value_t<decltype(input)>;
 
         if (count > input.size()) [[unlikely]] {
@@ -80,7 +80,7 @@ namespace utils {
 struct vertex final {
 private:
     [[gnu::cold]]
-    static inline unsigned next_id(void) noexcept {
+    static unsigned next_id(void) noexcept {
         static unsigned count = 1;
         return count++;
     }
