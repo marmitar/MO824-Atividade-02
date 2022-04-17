@@ -33,7 +33,7 @@ namespace utils {
     }
 
     [[gnu::hot]]
-    static inline tour min_sub_tour(const std::vector<vertex>& vertices, model auto&& get_solution) noexcept {
+    static tour min_sub_tour(const std::vector<vertex>& vertices, model auto&& get_solution) noexcept {
         const auto solutions = get_solutions(vertices.size(), get_solution);
         return tour::min_sub_tour(vertices, solutions);
     }
@@ -71,7 +71,7 @@ private:
                 expr += this->vars[tour[u]][tour[v]];
             }
         }
-        this->addLazy(expr, GRB_EQUAL, this->count()-1);
+        this->addLazy(expr, GRB_LESS_EQUAL, tour.size()-1);
     }
 
 protected:

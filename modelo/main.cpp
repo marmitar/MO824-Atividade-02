@@ -104,9 +104,21 @@ public:
     [[gnu::hot]]
     void run(void) const {
         auto g = this->map();
+        std::cout << "Graph(n=" << g.order() << ",m=" << g.size() << "),"
+            << " chosen with seed 0x" << std::hex << this->seed() << std::dec << std::endl;
+
+        std::cout << "Model set up, with " << g.var_count() << " variables" <<
+            " and " << g.constr_count() << " constraints." << std::endl;
 
         auto elapsed = g.solve();
-        std::cout << elapsed << '\n';
+        std::cout << "Found " << g.solution_count() << " solution(s)."  << std::endl;
+        std::cout << "Iterations: " << g.iterations() << std::endl;
+        std::cout << "Execution time: " << elapsed << " secs" << std::endl;
+        std::cout << "Variables: " << g.var_count() << std::endl;
+        std::cout << "Constraints: " << g.constr_count() << std::endl;
+
+        std::cout << "Tour:" << std::endl;
+        std::cout << utils::join(g.solution(), "\n") << std::endl;
     }
 };
 
@@ -119,7 +131,7 @@ namespace timeout {
             const auto end = std::chrono::steady_clock::now();
             std::chrono::duration<double, std::ratio<60>> elapsed = end - start;
 
-            std::cerr << "Timeout: stoppping execution for taking too long." << std::endl;
+            std::cerr << "Timeout: stopping execution for taking too long." << std::endl;
             std::cerr << "Instance has been running for " << elapsed.count() << " minutes." << std::endl;
             std::exit(EXIT_FAILURE);
         }
@@ -145,18 +157,25 @@ int main(int argc, const char * const argv[]) {
         timeout::setup(program.timeout());
     }
 
-#ifdef NDEBUG
-    program.run();
-#else
     try {
         program.run();
+
+    } catch (const utils::invalid_solution& err) {
+        std::cerr << "utils::invalid_solution: " << err.what() << std::endl;
+        std::cerr << "seed used: 0x" << std::hex << program.seed() << std::dec << std::endl;
+        if (err.subtour) {
+            std::cerr << "subtour(" << err.subtour->size() << "): "
+                << utils::join(*err.subtour, " ") << std::endl;
+        }
+        std::cerr << "vertices:" << std::endl;
+        std::cerr << utils::join(err.vertices, "\n") << std::endl;
 
     } catch (const std::exception& err) {
         std::cerr << "std::exception: " << err.what() << std::endl;
         return EXIT_FAILURE;
 
     } catch (const GRBException& err) {
-        std::cerr << "GRBException: " << err.getMessage() << std::endl;
+        std::cerr << "GRBException: code " << err.getErrorCode() << ", " << err.getMessage() << std::endl;
         std::cerr << "GRBEnv::getErrorMsg: " << program.env.getErrorMsg() << std::endl;
         return EXIT_FAILURE;
 
@@ -164,6 +183,5 @@ int main(int argc, const char * const argv[]) {
         std::cerr << "unknown exception!" << std::endl;
         return EXIT_FAILURE;
     }
-#endif
     return EXIT_SUCCESS;
 }

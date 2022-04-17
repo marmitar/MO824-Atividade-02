@@ -1,6 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <iostream>
+#include <optional>
+#include <ranges>
+#include <stdexcept>
+#include <sstream>
 #include <vector>
 
 #include <gurobi_c++.h>
@@ -10,13 +15,51 @@
 
 namespace utils {
     [[gnu::cold]]
-    static inline GRBEnv quiet_env(void) {
+    static GRBEnv quiet_env(void) {
         auto env = GRBEnv(true);
         env.set(GRB_IntParam_OutputFlag, 0);
         env.set(GRB_IntParam_LazyConstraints, 1);
         env.start();
         return env;
     }
+
+    [[gnu::cold]]
+    static std::string join(std::ranges::forward_range auto range, const std::string_view& sep) {
+        std::ostringstream buf;
+        bool first = true;
+
+        for (const auto& item : range) {
+            if (!first) {
+                buf << sep;
+            }
+            buf << item;
+            first = false;
+        }
+        return buf.str();
+    }
+
+    class invalid_solution final : public std::domain_error {
+    public:
+        const std::vector<vertex> vertices;
+        const std::optional<tour> subtour;
+
+    private:
+        [[gnu::cold]]
+        explicit inline invalid_solution(std::vector<vertex> vertices, std::optional<tour> subtour, const char *message):
+            std::domain_error(message), vertices(vertices), subtour(subtour)
+        { }
+
+    public:
+        [[gnu::cold]]
+        static invalid_solution zero_solutions(const std::vector<vertex>& vertices) {
+            return invalid_solution(vertices, std::nullopt, "No integral solution could be found.");
+        }
+
+        [[gnu::cold]]
+        static invalid_solution incomplete_tour(const std::vector<vertex>& vertices, tour& subtour) {
+            return invalid_solution(vertices, subtour, "Solution found, but leads to incomplete tour.");
+        }
+    };
 }
 
 
@@ -58,6 +101,7 @@ private:
             }
             this->model.addConstr(expr, GRB_EQUAL, 2.);
         }
+        this->model.update();
     }
 
 public:
@@ -81,17 +125,7 @@ public:
     [[gnu::pure]] [[gnu::cold]] [[gnu::nothrow]]
     inline size_t size(void) const noexcept {
         const size_t order = this->order();
-        return (order * (order + 1)) / 2;
-    }
-
-    [[gnu::pure]] [[gnu::cold]]
-    inline int64_t solution_count(void) const {
-        return (int64_t) this->model.get(GRB_IntAttr_SolCount);
-    }
-
-    [[gnu::pure]] [[gnu::cold]]
-    inline int64_t iterations(void) const {
-        return (int64_t) this->model.get(GRB_DoubleAttr_IterCount);
+        return (order * (order - 1)) / 2;
     }
 
     using clock = std::chrono::high_resolution_clock;
@@ -104,14 +138,71 @@ public:
         return secs.count();
     }
 
+    [[gnu::pure]] [[gnu::cold]]
+    inline int64_t solution_count(void) const {
+        return (int64_t) this->model.get(GRB_IntAttr_SolCount);
+    }
+
     [[gnu::hot]]
     double solve(void) {
         auto callback = subtour_elim(this->vertices, this->vars);
-
         this->model.setCallback(&callback);
-        this->model.update();
 
         this->model.optimize();
-        return this->elapsed();
+        auto total_time = this->elapsed();
+
+        if (this->solution_count() <= 0) [[unlikely]] {
+            throw utils::invalid_solution::zero_solutions(this->vertices);
+        }
+        return total_time;
     }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline int64_t iterations(void) const {
+        return (int64_t) this->model.get(GRB_DoubleAttr_IterCount);
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline int64_t var_count(void) const {
+        return (int64_t) this->model.get(GRB_IntAttr_NumVars);
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline int64_t constr_count(void) const {
+        return (int64_t) this->model.get(GRB_IntAttr_NumConstrs);
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline auto edges(void) const {
+        return utils::get_solutions(this->order(), [this](unsigned i, unsigned j) {
+            return this->vars[i][j].get(GRB_DoubleAttr_X) > 0.5;
+        });
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline auto tour(void) const {
+        auto min = utils::min_sub_tour(this->vertices, [this](unsigned i, unsigned j) {
+            return this->vars[i][j].get(GRB_DoubleAttr_X) > 0.5;
+        });
+
+        if (min.size() != this->order()) [[unlikely]] {
+            throw utils::invalid_solution::incomplete_tour(this->vertices, min);
+        }
+        return min;
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline auto solution(void) const {
+        const auto tour = this->tour();
+
+        auto vertices = std::vector<vertex>();
+        vertices.reserve(tour.size());
+
+        for (unsigned v : tour) {
+            vertices.push_back(this->vertices[v]);
+        }
+        return vertices;
+    }
+
+    // inline
 };

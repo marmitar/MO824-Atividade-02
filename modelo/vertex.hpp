@@ -13,14 +13,14 @@ namespace utils {
     class invalid_file final : public std::invalid_argument {
     private:
         [[gnu::cold]]
-        static std::string message(const std::string& filename, const char *reason) noexcept {
+        static inline std::string message(const std::string& filename, const char *reason) noexcept {
             std::ostringstream buf;
             buf << "File \"" << filename << "\" " << reason << ".";
             return buf.str();
         }
 
         [[gnu::cold]]
-        explicit invalid_file(const std::string& filename, const char *reason):
+        explicit inline invalid_file(const std::string& filename, const char *reason):
             std::invalid_argument(message(filename, reason))
         { }
 
@@ -40,14 +40,14 @@ namespace utils {
     class not_enough_items final : public std::out_of_range {
     private:
         [[gnu::cold]]
-        static std::string message(const char *type, size_t current, size_t expected) noexcept {
+        static inline std::string message(const char *type, size_t current, size_t expected) noexcept {
             std::ostringstream buf;
             buf << "Not enough '" << type << "', requesting " << expected << " out of " << current << " available." << '.';
             return buf.str();
         }
 
         [[gnu::cold]]
-        explicit not_enough_items(const char *type, size_t current, size_t expected):
+        explicit inline not_enough_items(const char *type, size_t current, size_t expected):
             std::out_of_range(message(type, current, expected))
         { }
 
@@ -61,7 +61,7 @@ namespace utils {
     using seed_type = std::ranlux48::result_type;
 
     [[gnu::cold]]
-    static inline auto sample(std::ranges::forward_range auto&& input, size_t count, seed_type seed) {
+    static inline auto sample(std::ranges::forward_range auto input, size_t count, seed_type seed) {
         using item = std::ranges::range_value_t<decltype(input)>;
 
         if (count > input.size()) [[unlikely]] {
@@ -164,7 +164,8 @@ public:
 
     [[gnu::cold]]
     friend inline std::ostream& operator<<(std::ostream& os, const vertex& vertex) {
-        return os << "v:" << vertex.id();
+        return os << "v<" << vertex.id() << ">("
+            << vertex.x1 << "," << vertex.y1 << "," << vertex.x2 << "," << vertex.y2 << ")";
     }
 
     [[gnu::cold]]
