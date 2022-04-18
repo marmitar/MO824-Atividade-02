@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <random>
 #include <ranges>
@@ -10,7 +11,7 @@
 
 
 namespace utils {
-    class invalid_file final : public std::invalid_argument {
+    struct invalid_file final : public std::invalid_argument {
     private:
         [[gnu::cold]]
         static inline std::string message(const std::string& filename, const char *reason) noexcept {
@@ -37,7 +38,7 @@ namespace utils {
     };
 
 
-    class not_enough_items final : public std::out_of_range {
+    struct not_enough_items final : public std::out_of_range {
     private:
         [[gnu::cold]]
         static inline std::string message(const char *type, size_t current, size_t expected) noexcept {
@@ -58,6 +59,7 @@ namespace utils {
         }
     };
 
+
     using seed_type = std::ranlux48::result_type;
 
     [[gnu::cold]]
@@ -74,25 +76,53 @@ namespace utils {
         std::ranges::sample(input, std::back_inserter(output), count, rng);
         return output;
     }
+
+    template <typename Item>
+    using pair = std::array<Item, 2>;
 }
 
 
 struct vertex final {
+public:
+    struct point final {
+    private:
+        double x;
+        double y;
+
+    public:
+        [[gnu::hot]] [[gnu::nothrow]]
+        constexpr inline point(double x, double y) noexcept: x(x), y(y) { }
+
+        [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
+        constexpr inline double cost(const point& other) const noexcept {
+            return ceil(hypot(this->x - other.x, this->y - other.y));
+        }
+
+        [[gnu::cold]]
+        friend inline std::ostream& operator<<(std::ostream& os, const point& p) {
+            return os << p.x << ',' << p.y;
+        }
+
+        [[gnu::cold]]
+        friend inline std::istream& operator>>(std::istream& is, point& p) {
+            return is >> p.x >> p.y;
+        }
+    };
+
 private:
     [[gnu::cold]]
-    static unsigned next_id(void) noexcept {
+    static unsigned next_id() noexcept {
         static unsigned count = 1;
         return count++;
     }
 
     [[gnu::cold]]
     inline constexpr vertex(unsigned id, double x1, double y1, double x2, double y2) noexcept:
-        ident(id), x1(x1), y1(y1), x2(x2), y2(y2)
+        ident(id), p({ point(x1, y1), point(x2, y2) })
     { }
 
     unsigned ident;
-    double x1, y1;
-    double x2, y2;
+    utils::pair<point> p;
 
 public:
     constexpr vertex() noexcept: vertex(0U, 0, 0, 0, 0) {}
@@ -102,36 +132,14 @@ public:
         vertex(vertex::next_id(), x1, y1, x2, y2)
     { }
 
-    vertex(const vertex& v) noexcept: vertex(v.ident, v.x1, v.y1, v.x2, v.y2) { }
-
     [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-    constexpr inline unsigned id(void) const noexcept {
+    constexpr inline unsigned id() const noexcept {
         return this->ident;
     }
 
     [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-    constexpr inline double cost1(const vertex& other) const noexcept {
-        return ceil(hypot(this->x1 - other.x1, this->y1 - other.y1));
-    }
-
-    [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-    constexpr inline double cost2(const vertex& other) const noexcept {
-        return ceil(hypot(this->x2 - other.x2, this->y2 - other.y2));
-    }
-
-    [[gnu::pure]] [[gnu::nothrow]]
-    constexpr inline bool operator==(const vertex& other) const noexcept {
-        return this->id() == other.id();
-    }
-
-    [[gnu::nothrow]]
-    constexpr inline vertex& operator=(const vertex& other) noexcept {
-        this->ident = other.id();
-        this->x1 = other.x1;
-        this->y1 = other.y1;
-        this->x2 = other.x2;
-        this->y2 = other.y2;
-        return *this;
+    constexpr inline const point& operator[](std::uint8_t idx) const noexcept {
+        return this->p[idx];
     }
 
     template <unsigned id> [[gnu::cold]]
@@ -164,12 +172,11 @@ public:
 
     [[gnu::cold]]
     friend inline std::ostream& operator<<(std::ostream& os, const vertex& vertex) {
-        return os << "v<" << vertex.id() << ">("
-            << vertex.x1 << "," << vertex.y1 << "," << vertex.x2 << "," << vertex.y2 << ")";
+        return os << "v<" << vertex.id() << ">(" << vertex.p[0] << "," << vertex.p[1] << ")";
     }
 
     [[gnu::cold]]
     friend inline std::istream& operator>>(std::istream& is, vertex& vertex) {
-        return is >> vertex.x1 >> vertex.y1 >> vertex.x2 >> vertex.y2;
+        return is >> vertex.p[0] >> vertex.p[1];
     }
 };

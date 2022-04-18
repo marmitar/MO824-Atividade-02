@@ -39,26 +39,26 @@ namespace utils {
     }
 }
 
-class subtour_elim final : public GRBCallback {
+struct subtour_elim final : public GRBCallback {
 public:
     const std::vector<vertex>& vertices;
-    const  utils::matrix<GRBVar>& vars;
+    const  utils::pair<utils::matrix<GRBVar>>& vars;
 
     [[gnu::cold]] [[gnu::nothrow]]
-    inline subtour_elim(const std::vector<vertex>& vertices, const  utils::matrix<GRBVar>& vars) noexcept:
+    inline subtour_elim(const std::vector<vertex>& vertices, const utils::pair<utils::matrix<GRBVar>>& vars) noexcept:
         GRBCallback(), vertices(vertices), vars(vars)
     { }
 
 private:
     [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-    inline size_t count(void) const noexcept {
+    inline size_t count() const noexcept {
         return this->vertices.size();
     }
 
     [[gnu::hot]]
-    inline void lazy_constraint_subtour_elimination(void) {
-        auto tour = utils::min_sub_tour(this->vertices, [this](unsigned i, unsigned j) {
-            return this->getSolution(this->vars[i][j]) > 0.5;
+    inline void lazy_constraint_subtour_elimination(uint8_t i) {
+        auto tour = utils::min_sub_tour(this->vertices, [this, i](unsigned u, unsigned v) {
+            return this->getSolution(this->vars[i][u][v]) > 0.5;
         });
 
         if (tour.size() >= this->count()) [[unlikely]] {
@@ -68,7 +68,7 @@ private:
         auto expr = GRBLinExpr();
         for (unsigned u = 0; u < tour.size(); u++) {
             for (unsigned v = u + 1; v < tour.size(); v++) {
-                expr += this->vars[tour[u]][tour[v]];
+                expr += this->vars[i][tour[u]][tour[v]];
             }
         }
         this->addLazy(expr, GRB_LESS_EQUAL, tour.size()-1);
@@ -76,9 +76,10 @@ private:
 
 protected:
     [[gnu::hot]]
-    void callback(void) {
+    void callback() {
         if (this->where == GRB_CB_MIPSOL) [[likely]] {
-            this->lazy_constraint_subtour_elimination();
+            this->lazy_constraint_subtour_elimination(0);
+            this->lazy_constraint_subtour_elimination(1);
         }
     }
 };

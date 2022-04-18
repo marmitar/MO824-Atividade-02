@@ -11,7 +11,7 @@
 #include "argparse.hpp"
 
 
-class program final {
+struct program final {
 private:
     argparse::ArgumentParser args;
 
@@ -43,7 +43,7 @@ private:
     }
 
     [[gnu::cold]]
-    void setup_env(void) {
+    void setup_env() {
         env.set(GRB_IntParam_OutputFlag, 0);
         env.set(GRB_IntParam_LazyConstraints, 1);
 
@@ -69,7 +69,7 @@ public:
     GRBEnv env = GRBEnv(true);
 
     [[gnu::cold]]
-    inline std::optional<std::string> filename(void) const {
+    inline std::optional<std::string> filename() const {
         auto filename = this->args.get("filename");
         if (filename.empty()) {
             return std::nullopt;
@@ -79,17 +79,17 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline utils::seed_type seed(void) const {
+    inline utils::seed_type seed() const {
         return this->args.get<utils::seed_type>("seed");
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline size_t nodes(void) const {
+    inline size_t nodes() const {
         return this->args.get<unsigned>("nodes");
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline std::optional<double> timeout(void) const {
+    inline std::optional<double> timeout() const {
         auto value = this->args.get<double>("timeout");
         if (std::isfinite(value) && value > 0) [[likely]] {
             return value;
@@ -99,13 +99,13 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline bool tour(void) const {
+    inline bool tour() const {
         return this->args.get<bool>("tour");
     }
 
 private:
     [[gnu::cold]]
-    inline std::variant<std::vector<vertex>, decltype(DEFAULT_VERTICES)> vertices(void) const {
+    inline std::variant<std::vector<vertex>, decltype(DEFAULT_VERTICES)> vertices() const {
         if (auto filename = this->filename()) {
             return vertex::read(*filename);
         } else {
@@ -114,7 +114,7 @@ private:
     }
 
     [[gnu::cold]]
-    inline std::vector<vertex> sample(void) const {
+    inline std::vector<vertex> sample() const {
         auto sampler = [this](auto&& vertices) {
             return utils::sample(vertices, this->nodes(), this->seed());
         };
@@ -122,13 +122,13 @@ private:
     }
 
     [[gnu::cold]]
-    graph map(void) const {
+    graph map() const {
         return graph(this->sample(), this->env);
     }
 
 public:
     [[gnu::hot]]
-    void run(void) const {
+    void run() const {
         auto g = this->map();
         std::cout << "Graph(n=" << g.order() << ",m=" << g.size() << "),"
             << " chosen with seed 0x" << std::hex << this->seed() << std::dec << std::endl;
@@ -141,10 +141,12 @@ public:
         std::cout << "Constraints: " << g.constr_count() << std::endl;
         std::cout << "Objective cost: " << g.solution_cost() << std::endl;
 
-        auto solution = g.solution();
-        std::cout << "Tour: total cost " << tour::cost1(solution) << std::endl;
-        if (this->tour()) [[unlikely]] {
-            std::cout << utils::join(solution, "\n") << std::endl;
+        for (uint8_t i = 0; i <= 1; i++) {
+            auto solution = g.solution(i);
+            std::cout << "Tour " << i+1 << ": total cost " << tour::cost(i, solution) << std::endl;
+            if (this->tour()) [[unlikely]] {
+                std::cout << utils::join(solution, "\n") << std::endl;
+            }
         }
     }
 };

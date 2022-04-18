@@ -14,7 +14,7 @@
 
 
 namespace utils {
-    class invalid_solution final : public std::domain_error {
+    struct invalid_solution final : public std::domain_error {
     public:
         const std::vector<vertex> vertices;
         const std::optional<tour> subtour;
@@ -59,35 +59,35 @@ private:
     GRBModel model;
 
     [[gnu::cold]]
-    inline GRBVar add_edge(const vertex& u, const vertex& v) {
+    inline GRBVar add_edge(uint8_t i, const vertex& u, const vertex& v) {
         std::ostringstream name;
-        name << "x_" << u.id() << '_' << v.id();
+        name << 'x' << i << '_' << u.id() << '_' << v.id();
 
-        double objective = u.cost1(v);
+        double objective = u[i].cost(v[i]);
         return this->model.addVar(0., 1., objective, GRB_BINARY, name.str());
     }
 
     [[gnu::cold]]
-    inline auto add_vars(void) {
-        utils::matrix<GRBVar> vars(this->order());
+    inline utils::matrix<GRBVar> add_vars(uint8_t i) {
+        auto vars = utils::matrix<GRBVar>(this->order());
 
         for (unsigned u = 0; u < this->order(); u++) {
             for (unsigned v = u + 1; v < this->order(); v++) {
-                auto x_uv = this->add_edge(this->vertices[u], this->vertices[v]);
-                vars[u][v] = x_uv;
-                vars[v][u] = x_uv;
+                auto xi_uv = this->add_edge(i, this->vertices[u], this->vertices[v]);
+                vars[u][v] = xi_uv;
+                vars[v][u] = xi_uv;
             }
         }
         return vars;
     }
 
     [[gnu::cold]]
-    inline void add_constraint_deg_2(void) {
+    inline void add_constraint_deg_2(uint8_t i) {
         for (unsigned u = 0; u < this->order(); u++) {
             auto expr = GRBLinExpr();
             for (unsigned v = 0; v < this->order(); v++) {
                 if (u != v) [[likely]] {
-                    expr += this->vars[u][v];
+                    expr += this->vars[i][u][v];
                 }
             }
             this->model.addConstr(expr, GRB_EQUAL, 2.);
@@ -98,23 +98,24 @@ private:
 public:
     [[gnu::cold]]
     graph(std::vector<vertex> vertices, const GRBEnv& env):
-        model(env), vertices(vertices), vars(this->add_vars())
+        model(env), vertices(vertices), vars({ this->add_vars(0), this->add_vars(1) })
     {
-        this->add_constraint_deg_2();
+        this->add_constraint_deg_2(0);
+        this->add_constraint_deg_2(1);
     }
 
     const std::vector<vertex> vertices;
-    const  utils::matrix<GRBVar> vars;
+    const  utils::pair<utils::matrix<GRBVar>> vars;
 
     /** Number of vertices. */
     [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-    inline size_t order(void) const noexcept {
+    inline size_t order() const noexcept {
         return this->vertices.size();
     }
 
     /** Number of edges. */
     [[gnu::pure]] [[gnu::cold]] [[gnu::nothrow]]
-    inline size_t size(void) const noexcept {
+    inline size_t size() const noexcept {
         const size_t order = this->order();
         return (order * (order - 1)) / 2;
     }
@@ -123,19 +124,19 @@ public:
     const clock::time_point start = clock::now();
 
     [[gnu::cold]] [[gnu::nothrow]]
-    inline double elapsed(void) const noexcept {
+    inline double elapsed() const noexcept {
         auto end = clock::now();
         std::chrono::duration<double> secs = end - this->start;
         return secs.count();
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    int64_t solution_count(void) const {
-        return (int64_t) this->model.get(GRB_IntAttr_SolCount);
+    int64_t solution_count() const {
+        return this->model.get(GRB_IntAttr_SolCount);
     }
 
     [[gnu::hot]]
-    double solve(void) {
+    double solve() {
         auto callback = subtour_elim(this->vertices, this->vars);
         this->model.setCallback(&callback);
 
@@ -149,36 +150,36 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    int64_t iterations(void) const {
+    int64_t iterations() const {
         return this->model.get(GRB_DoubleAttr_IterCount);
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    int64_t var_count(void) const {
+    int64_t var_count() const {
         return this->model.get(GRB_IntAttr_NumVars);
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    int64_t constr_count(void) const {
+    int64_t constr_count() const {
         return this->model.get(GRB_IntAttr_NumConstrs);
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    double solution_cost(void) const {
+    double solution_cost() const {
         return this->model.get(GRB_DoubleAttr_ObjVal);
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    auto edges(void) const {
-        return utils::get_solutions(this->order(), [this](unsigned i, unsigned j) {
-            return this->vars[i][j].get(GRB_DoubleAttr_X) > 0.5;
+    auto edges(uint8_t i) const {
+        return utils::get_solutions(this->order(), [this, i](unsigned u, unsigned v) {
+            return this->vars[i][u][v].get(GRB_DoubleAttr_X) > 0.5;
         });
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    auto tour(void) const {
-        auto min = utils::min_sub_tour(this->vertices, [this](unsigned i, unsigned j) {
-            return this->vars[i][j].get(GRB_DoubleAttr_X) > 0.5;
+    auto tour(uint8_t i) const {
+        auto min = utils::min_sub_tour(this->vertices, [this, i](unsigned u, unsigned v) {
+            return this->vars[i][u][v].get(GRB_DoubleAttr_X) > 0.5;
         });
 
         if (min.size() != this->order()) [[unlikely]] {
@@ -188,8 +189,8 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    auto solution(void) const {
-        const auto tour = this->tour();
+    auto solution(uint8_t i) const {
+        const auto tour = this->tour(i);
 
         auto vertices = std::vector<vertex>();
         vertices.reserve(tour.size());

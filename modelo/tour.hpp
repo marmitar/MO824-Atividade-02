@@ -10,7 +10,7 @@
 
 namespace utils {
     template <typename Item>
-    class matrix final {
+    struct matrix final {
     private:
         Item *buffer;
         size_t len;
@@ -25,12 +25,12 @@ namespace utils {
         }
 
         [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-        constexpr size_t size(void) const noexcept {
+        constexpr size_t size() const noexcept {
             return this->len;
         }
 
         [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-        constexpr size_t total(void) const noexcept {
+        constexpr size_t total() const noexcept {
             return this->size() * this->size();
         }
 
@@ -47,9 +47,9 @@ namespace utils {
 }
 
 
-class tour final : public std::vector<unsigned> {
+struct tour final : public std::vector<unsigned> {
 private:
-    class iter_tours final {
+    struct iter_tours final {
     public:
         inline iter_tours(
             const std::vector<vertex>& vertices,
@@ -64,12 +64,12 @@ private:
         const  utils::matrix<bool>& solution;
 
         [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-        inline size_t count(void) const noexcept {
+        inline size_t count() const noexcept {
             return this->vertices.size();
         }
 
         [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
-        inline std::optional<unsigned> new_node(void) const noexcept {
+        inline std::optional<unsigned> new_node() const noexcept {
             for (unsigned node = 0; node < this->count(); node++) {
                 if (!this->seen[node]) [[likely]] {
                     return node;
@@ -109,7 +109,7 @@ private:
 
     public:
         [[gnu::hot]]
-        inline std::optional<tour> next_tour(void) noexcept {
+        inline std::optional<tour> next_tour() noexcept {
             if (auto node = this->new_node()) [[likely]] {
                 return this->next_tour(*node);
             }
@@ -142,21 +142,11 @@ public:
     }
 
     [[gnu::pure]] [[gnu::nothrow]]
-    static double cost1(const std::vector<vertex>& tour) noexcept {
+    static double cost(uint8_t i, const std::vector<vertex>& tour) noexcept {
         double total_cost = 0.0;
-        for (unsigned i = 0; i < tour.size(); i++) {
-            const unsigned next = (i + 1) % tour.size();
-            total_cost += tour[i].cost1(tour[next]);
-        }
-        return total_cost;
-    }
-
-    [[gnu::pure]] [[gnu::nothrow]]
-    static double cost2(const std::vector<vertex>& tour) noexcept {
-        double total_cost = 0.0;
-        for (unsigned i = 0; i < tour.size(); i++) {
-            const unsigned next = (i + 1) % tour.size();
-            total_cost += tour[i].cost2(tour[next]);
+        for (unsigned v = 0; v < tour.size(); v++) {
+            const unsigned next = (v + 1) % tour.size();
+            total_cost += tour[v][i].cost(tour[next][i]);
         }
         return total_cost;
     }
