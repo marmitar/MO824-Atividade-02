@@ -18,16 +18,21 @@
     \subsection{kS}
 
         \[
-            \min \sum_{e \in E} \left(c_e^1 x_e^1 + c_e^2 x_e^2\right)
+            \min \sum_{i = 1}^2 \sum_{e \in E} c_e^i x_e^i
         \]
 
         Constraints:
 
         \begin{align*}
-            \sum_{e \in \delta(v)} x_e = 2
-                && \forall v \in V \\
-            \sum_{e \in E(S)} x_e \leq |S| - 1
-                && \forall S \subset V \\
-            x_e \in \{0, 1\}
+            \sum_{e \in \delta(v)} x_e^i = 2
+                && \forall v \in V, \forall i \in \set{1, 2}
+            \\
+            \sum_{e \in E(S)} x_e^i \leq |S| - 1
+                && \forall S \subset V, \forall i \in \set{1, 2}
+            \\
+            x_e^i \in \{0, 1\}
+                && \forall e \in E, \forall i \in \set{1, 2}
+            \\
+            \sum_{e \in E} x_e^1 x_e^2 \geq k
                 && \forall e \in E
         \end{align*}

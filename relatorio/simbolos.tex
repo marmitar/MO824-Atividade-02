@@ -1,0 +1,74 @@
+\usepackage{amsmath, amssymb, bm, mathtools}
+\usepackage{etoolbox, xpatch, xspace}
+% \usepackage[mathcal]{euscript}
+% \usepackage[scr]{rsfso}
+% \usepackage{mathptmx}
+\usepackage{relsize, centernot}
+\usepackage{physics}
+
+
+\makeatletter
+
+% %% Símbolo QED %%
+% \renewcommand{\qedsymbol}{\ensuremath{\mathsmaller\blacksquare}}
+
+%% Marcadores de Prova: \direto, \inverso %%
+\newcommand{\direto}[1][~]{\ensuremath{(\rightarrow)}#1\xspace}
+\newcommand{\inverso}[1][~]{\ensuremath{(\leftarrow)}#1\xspace}
+
+\undef\sum
+%% Somatório: \sum_i^j, \bigsum_i^j %%
+\DeclareSymbolFont{cmex10}{OMX}{cmex}{m}{n}
+\DeclareMathSymbol{\sum@d}{\mathop}{cmex10}{"58}
+\DeclareMathSymbol{\sum@t}{\mathop}{cmex10}{"50}
+\DeclareMathOperator*{\sum}{\mathchoice{\sum@d}{\sum@t}{\sum@t}{\sum@t}}
+\DeclareMathOperator*{\bigsum}{\mathlarger{\mathlarger{\sum@d}}}
+
+%% Operadores de Conjunto: \pow(S), \Dom(S), \Img(S) %%
+\DeclareSymbolFont{boondox}{U}{BOONDOX-cal}{m}{n}
+\DeclareMathSymbol{\pow}{\mathalpha}{boondox}{"50}
+\DeclareMathOperator{\Dom}{Dom}
+\DeclareMathOperator{\Img}{Im}
+
+\undef\Phi
+%% Variantes gregas %%
+\DeclareSymbolFont{cmr10}{OT1}{cmr}{m}{n}
+\DeclareSymbolFont{cmmi10}{OML}{cmm}{m}{it}
+\DeclareMathSymbol{\Phi}{\mathalpha}{cmr10}{"08}
+\DeclareMathSymbol{\varpsi}{\mathalpha}{cmmi10}{"20}
+\DeclareMathSymbol{\varomega}{\mathalpha}{cmmi10}{"21}
+
+%% Família de Conjuntos: \family{S} %%
+\DeclareMathAlphabet{\family}{OMS}{cmsy}{m}{n}
+
+\undef\natural
+\undef\real
+%% Conjuntos Padrões: R, N, Z, C, Q %%
+\DeclareMathOperator{\real}{\mathbb{R}}
+\DeclareMathOperator{\natural}{\mathbb{N}}
+\DeclareMathOperator{\integer}{\mathbb{Z}}
+\DeclareMathOperator{\complex}{\mathbb{C}}
+\DeclareMathOperator{\rational}{\mathbb{Q}}
+
+%% Definição de Conjuntos: \set{ _ \mid _ } %%
+\newcommand{\set}[1]{%
+    \begingroup%
+        \def\mid{\;\middle|\;}%
+        \left\{#1\right\}
+    \endgroup%
+}
+
+%% Novos Operadores: \modulo, \symdif, \grau %%
+\DeclareMathOperator{\modulo}{~mod~}
+\DeclareMathOperator{\symdif}{\mathrel{\triangle}}
+\DeclareMathOperator{\grau}{deg}
+
+%% Operadores Delimitados: \abs{\sum_i^j}, x \equiv y \emod{n} %%
+% \newcommand{\abs}[1]{{\left\lvert\,#1\,\right\rvert}}
+\newcommand{\emod}[1]{\ \left(\mathrm{mod}\ #1\right)}
+
+%% Vérices e Arestas %%
+\DeclareMathOperator{\Adj}{Adj}
+\DeclareMathOperator{\dist}{dist}
+
+\makeatother

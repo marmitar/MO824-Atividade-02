@@ -37,9 +37,14 @@ private:
             .scan<'g', double>();
 
         this->args.add_argument("-t", "--tour")
-            .help("execution timeout (in minutes), disabled if zero or negative")
+            .help("show vertices present on each solution")
             .default_value(false)
             .implicit_value(true);
+
+        this->args.add_argument("-k", "--similarity")
+            .help("minimun number of shared edges between tours")
+            .default_value<unsigned>(0)
+            .scan<'u', unsigned>();
     }
 
     [[gnu::cold]]
@@ -84,8 +89,13 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    inline size_t nodes() const {
+    inline unsigned nodes() const {
         return this->args.get<unsigned>("nodes");
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    inline unsigned similarity() const {
+        return this->args.get<unsigned>("similarity");
     }
 
     [[gnu::pure]] [[gnu::cold]]
@@ -123,7 +133,7 @@ private:
 
     [[gnu::cold]]
     graph map() const {
-        return graph(this->sample(), this->env);
+        return graph(this->sample(), this->env, this->similarity());
     }
 
 public:
@@ -133,16 +143,19 @@ public:
         std::cout << "Graph(n=" << g.order() << ",m=" << g.size() << "),"
             << " chosen with seed 0x" << std::hex << this->seed() << std::dec << std::endl;
 
-        auto elapsed = g.solve();
+        const auto elapsed = g.solve();
         std::cout << "Found " << g.solution_count() << " solution(s)."  << std::endl;
         std::cout << "Iterations: " << g.iterations() << std::endl;
         std::cout << "Execution time: " << elapsed << " secs" << std::endl;
         std::cout << "Variables: " << g.var_count() << std::endl;
         std::cout << "Constraints: " << g.constr_count() << std::endl;
+        std::cout << "    Linear: " << g.lin_constr_count() << std::endl;
+        std::cout << "    Quadratic: " << g.quad_constr_count() << std::endl;
+        std::cout << "Similarity: " << g.similarity() << std::endl;
         std::cout << "Objective cost: " << g.solution_cost() << std::endl;
 
         for (uint8_t i = 0; i <= 1; i++) {
-            auto solution = g.solution(i);
+            const auto solution = g.solution(i);
             std::cout << "Tour " << i+1 << ": total cost " << tour::cost(i, solution) << std::endl;
             if (this->tour()) [[unlikely]] {
                 std::cout << utils::join(solution, "\n") << std::endl;

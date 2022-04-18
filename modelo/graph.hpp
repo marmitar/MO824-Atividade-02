@@ -92,16 +92,30 @@ private:
             }
             this->model.addConstr(expr, GRB_EQUAL, 2.);
         }
-        this->model.update();
+    }
+
+    [[gnu::cold]]
+    inline void add_constraint_similarity(double k) {
+        auto expr = GRBQuadExpr();
+        for (unsigned u = 0; u < this->order(); u++) {
+            for (unsigned v = u + 1; v < this->order(); v++) {
+                expr += this->vars[0][u][v] * this->vars[1][u][v];
+            }
+        }
+        this->model.addQConstr(expr, GRB_GREATER_EQUAL, k);
     }
 
 public:
     [[gnu::cold]]
-    graph(std::vector<vertex> vertices, const GRBEnv& env):
+    graph(std::vector<vertex> vertices, const GRBEnv& env, unsigned k):
         model(env), vertices(vertices), vars({ this->add_vars(0), this->add_vars(1) })
     {
         this->add_constraint_deg_2(0);
         this->add_constraint_deg_2(1);
+        if (k > 0) {
+            this->add_constraint_similarity(k);
+        }
+        this->model.update();
     }
 
     const std::vector<vertex> vertices;
@@ -160,8 +174,18 @@ public:
     }
 
     [[gnu::pure]] [[gnu::cold]]
-    int64_t constr_count() const {
+    int64_t lin_constr_count() const {
         return this->model.get(GRB_IntAttr_NumConstrs);
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    int64_t quad_constr_count() const {
+        return this->model.get(GRB_IntAttr_NumQConstrs);
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    int64_t constr_count() const {
+        return this->lin_constr_count() + this->quad_constr_count();
     }
 
     [[gnu::pure]] [[gnu::cold]]
@@ -169,23 +193,46 @@ public:
         return this->model.get(GRB_DoubleAttr_ObjVal);
     }
 
+    [[gnu::pure]] [[gnu::hot]]
+    inline bool edge(uint8_t i, unsigned u, unsigned v) const {
+        if (u != v) [[likely]] {
+            return this->vars[i][u][v].get(GRB_DoubleAttr_X) > 0.5;
+        } else {
+            return false;
+        }
+    }
+
     [[gnu::pure]] [[gnu::cold]]
     auto edges(uint8_t i) const {
         return utils::get_solutions(this->order(), [this, i](unsigned u, unsigned v) {
-            return this->vars[i][u][v].get(GRB_DoubleAttr_X) > 0.5;
+            return this->edge(i, u, v);
         });
     }
 
     [[gnu::pure]] [[gnu::cold]]
     auto tour(uint8_t i) const {
         auto min = utils::min_sub_tour(this->vertices, [this, i](unsigned u, unsigned v) {
-            return this->vars[i][u][v].get(GRB_DoubleAttr_X) > 0.5;
+            return this->edge(i, u, v);
         });
 
         if (min.size() != this->order()) [[unlikely]] {
             throw utils::invalid_solution::incomplete_tour(this->vertices, min);
         }
         return min;
+    }
+
+    [[gnu::pure]] [[gnu::cold]]
+    unsigned similarity() const {
+        unsigned total = 0;
+        for (unsigned u = 0; u < this->order(); u++) {
+            for (unsigned v = u + 1; v < this->order(); v++) {
+
+                if (this->edge(0, u, v) && this->edge(1, u, v)) [[unlikely]] {
+                    total += 1;
+                }
+            }
+        }
+        return total;
     }
 
     [[gnu::pure]] [[gnu::cold]]
