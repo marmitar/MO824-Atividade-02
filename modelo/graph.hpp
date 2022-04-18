@@ -3,9 +3,8 @@
 #include <chrono>
 #include <iostream>
 #include <optional>
-#include <ranges>
+#include <span>
 #include <stdexcept>
-#include <sstream>
 #include <vector>
 
 #include <gurobi_c++.h>
@@ -16,23 +15,23 @@
 namespace utils {
     struct invalid_solution final : public std::domain_error {
     public:
-        const std::vector<vertex> vertices;
+        const std::span<const vertex> vertices;
         const std::optional<tour> subtour;
 
     private:
         [[gnu::cold]]
-        explicit inline invalid_solution(std::vector<vertex> vertices, std::optional<tour> subtour, const char *message):
+        explicit inline invalid_solution(std::span<const vertex> vertices, std::optional<tour> subtour, const char *message):
             std::domain_error(message), vertices(vertices), subtour(subtour)
         { }
 
     public:
         [[gnu::cold]]
-        static invalid_solution zero_solutions(const std::vector<vertex>& vertices) {
+        static invalid_solution zero_solutions(std::span<const vertex> vertices) {
             return invalid_solution(vertices, std::nullopt, "No integral solution could be found.");
         }
 
         [[gnu::cold]]
-        static invalid_solution incomplete_tour(const std::vector<vertex>& vertices, tour& subtour) {
+        static invalid_solution incomplete_tour(std::span<const vertex> vertices, tour& subtour) {
             return invalid_solution(vertices, subtour, "Solution found, but leads to incomplete tour.");
         }
     };
@@ -107,7 +106,7 @@ private:
 
 public:
     [[gnu::cold]]
-    graph(std::vector<vertex> vertices, const GRBEnv& env, unsigned k):
+    graph(std::span<const vertex> vertices, const GRBEnv& env, unsigned k = 0):
         model(env), vertices(vertices), vars({ this->add_vars(0), this->add_vars(1) })
     {
         this->add_constraint_deg_2(0);
@@ -118,7 +117,7 @@ public:
         this->model.update();
     }
 
-    const std::vector<vertex> vertices;
+    const std::span<const vertex> vertices;
     const  utils::pair<utils::matrix<GRBVar>> vars;
 
     /** Number of vertices. */

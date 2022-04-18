@@ -1,10 +1,7 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
-#include <fstream>
-#include <random>
-#include <ranges>
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -53,29 +50,11 @@ namespace utils {
         { }
 
     public:
-        template <typename Item> [[gnu::cold]]
-        static not_enough_items of(size_t current, size_t expected) {
-            return not_enough_items(typeid(Item).name(), current, expected);
+        template <typename Item, size_t N> [[gnu::cold]]
+        static not_enough_items in(std::array<Item, N> current, size_t expected) {
+            return not_enough_items(typeid(Item).name(), current.size(), expected);
         }
     };
-
-
-    using seed_type = std::ranlux48::result_type;
-
-    [[gnu::cold]]
-    static auto sample(std::ranges::forward_range auto input, size_t count, seed_type seed) {
-        using item = std::ranges::range_value_t<decltype(input)>;
-
-        if (count > input.size()) [[unlikely]] {
-            throw not_enough_items::of<item>(input.size(), count);
-        }
-        std::vector<item> output;
-        output.reserve(count);
-
-        auto rng = std::ranlux48(seed);
-        std::ranges::sample(input, std::back_inserter(output), count, rng);
-        return output;
-    }
 
     template <typename Item>
     using pair = std::array<Item, 2>;
@@ -146,28 +125,6 @@ public:
     constexpr static vertex with_id(double x1, double y1, double x2, double y2) noexcept {
         static_assert(id > 0, "'id' must be positive.");
         return vertex(id, x1, y1, x2, y2);
-    }
-
-    [[gnu::cold]]
-    static std::vector<vertex> read(const std::string& filename) {
-        auto vertices = std::vector<vertex>();
-        auto file = std::ifstream(filename, std::ios::in);
-
-        auto line = std::string();
-        while (std::getline(file, line)) [[unlikely]] {
-            vertex new_vertex;
-            if (std::istringstream(line) >> new_vertex) {
-                vertices.push_back(new_vertex);
-            } else [[unlikely]] {
-                throw utils::invalid_file::contains_invalid_data(filename);
-            }
-        }
-        file.close();
-
-        if (vertices.size() <= 0) [[unlikely]] {
-            throw utils::invalid_file::is_empty_or_missing(filename);
-        }
-        return vertices;
     }
 
     [[gnu::cold]]

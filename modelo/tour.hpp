@@ -52,7 +52,7 @@ private:
     struct iter_tours final {
     public:
         inline iter_tours(
-            const std::vector<vertex>& vertices,
+            std::span<const vertex> vertices,
             const  utils::matrix<bool>& solution
         ) noexcept:
             seen(vertices.size(), false), vertices(vertices), solution(solution)
@@ -60,7 +60,7 @@ private:
 
     private:
         std::vector<bool> seen;
-        const std::vector<vertex>& vertices;
+        std::span<const vertex> vertices;
         const  utils::matrix<bool>& solution;
 
         [[gnu::pure]] [[gnu::hot]] [[gnu::nothrow]]
@@ -120,7 +120,7 @@ private:
 public:
     [[gnu::hot]] [[gnu::nothrow]]
     static tour min_sub_tour(
-        const std::vector<vertex>& vertices,
+        std::span<const vertex> vertices,
         const  utils::matrix<bool>& solution
     ) noexcept
     {

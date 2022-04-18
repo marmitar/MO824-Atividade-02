@@ -1,6 +1,7 @@
 #include <chrono>
 #include <csignal>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <unistd.h>
 #include <variant>
@@ -11,24 +12,31 @@
 #include "argparse.hpp"
 
 
+namespace utils {
+    [[gnu::cold]]
+    static GRBEnv quiet_env() {
+        auto env = GRBEnv(true);
+        env.set(GRB_IntParam_OutputFlag, 0);
+        env.set(GRB_IntParam_LazyConstraints, 1);
+        env.start();
+        return env;
+    }
+}
+
 struct program final {
 private:
     argparse::ArgumentParser args;
 
     [[gnu::cold]]
     explicit inline program(std::string name): args(name) {
-        this->args.add_argument("filename")
-            .help("file with coordinates: <x1> <y1> <x2> <y2>")
-            .default_value(std::string {});
-
-        this->args.add_argument("-s", "--seed")
-            .help("seed for the sampling method (if empty, a random seed is generated)")
-            .default_value<utils::seed_type>(std::random_device {}())
-            .scan<'x', utils::seed_type>();
-
         this->args.add_argument("-n", "--nodes")
             .help("sample size for the subgraph")
             .default_value<unsigned>(100)
+            .scan<'u', unsigned>();
+
+        this->args.add_argument("-k", "--similarity")
+            .help("minimun number of shared edges between tours")
+            .default_value<unsigned>(0)
             .scan<'u', unsigned>();
 
         this->args.add_argument("--timeout")
@@ -40,21 +48,6 @@ private:
             .help("show vertices present on each solution")
             .default_value(false)
             .implicit_value(true);
-
-        this->args.add_argument("-k", "--similarity")
-            .help("minimun number of shared edges between tours")
-            .default_value<unsigned>(0)
-            .scan<'u', unsigned>();
-    }
-
-    [[gnu::cold]]
-    void setup_env() {
-        env.set(GRB_IntParam_OutputFlag, 0);
-        env.set(GRB_IntParam_LazyConstraints, 1);
-
-        unsigned seed = this->seed() & 0x0FFFFFFFU;
-        env.set(GRB_IntParam_Seed, (int) seed);
-        env.start();
     }
 
 public:
@@ -62,7 +55,6 @@ public:
     explicit program(const std::vector<std::string>& arguments): program(arguments[0]) {
         try {
             this->args.parse_args(arguments);
-            this->setup_env();
 
         } catch (const std::runtime_error& err) {
             std::cerr << err.what() << std::endl;
@@ -71,22 +63,7 @@ public:
         }
     }
 
-    GRBEnv env = GRBEnv(true);
-
-    [[gnu::cold]]
-    inline std::optional<std::string> filename() const {
-        auto filename = this->args.get("filename");
-        if (filename.empty()) {
-            return std::nullopt;
-        } else [[likely]] {
-            return filename;
-        }
-    }
-
-    [[gnu::pure]] [[gnu::cold]]
-    inline utils::seed_type seed() const {
-        return this->args.get<utils::seed_type>("seed");
-    }
+    const GRBEnv env = utils::quiet_env();
 
     [[gnu::pure]] [[gnu::cold]]
     inline unsigned nodes() const {
@@ -115,33 +92,23 @@ public:
 
 private:
     [[gnu::cold]]
-    inline std::variant<std::vector<vertex>, decltype(DEFAULT_VERTICES)> vertices() const {
-        if (auto filename = this->filename()) {
-            return vertex::read(*filename);
-        } else {
-            return DEFAULT_VERTICES;
+    inline std::span<const vertex> vertices() const {
+        if (this->nodes() > DEFAULT_VERTICES.size()) [[unlikely]] {
+            throw utils::not_enough_items::in(DEFAULT_VERTICES, this->nodes());
         }
-    }
-
-    [[gnu::cold]]
-    inline std::vector<vertex> sample() const {
-        auto sampler = [this](auto&& vertices) {
-            return utils::sample(vertices, this->nodes(), this->seed());
-        };
-        return std::visit(sampler, this->vertices());
+        return std::span(DEFAULT_VERTICES).first(this->nodes());
     }
 
     [[gnu::cold]]
     graph map() const {
-        return graph(this->sample(), this->env, this->similarity());
+        return graph(this->vertices(), this->env, this->similarity());
     }
 
 public:
     [[gnu::hot]]
     void run() const {
         auto g = this->map();
-        std::cout << "Graph(n=" << g.order() << ",m=" << g.size() << "),"
-            << " chosen with seed 0x" << std::hex << this->seed() << std::dec << std::endl;
+        std::cout << "Graph(n=" << g.order() << ",m=" << g.size() << ")" << std::endl;
 
         const auto elapsed = g.solve();
         std::cout << "Found " << g.solution_count() << " solution(s)."  << std::endl;
@@ -204,7 +171,6 @@ int main(int argc, const char * const argv[]) {
 
     } catch (const utils::invalid_solution& err) {
         std::cerr << "utils::invalid_solution: " << err.what() << std::endl;
-        std::cerr << "seed used: 0x" << std::hex << program.seed() << std::dec << std::endl;
         if (err.subtour) {
             std::cerr << "subtour(" << err.subtour->size() << "): "
                 << utils::join(*err.subtour, " ") << std::endl;
